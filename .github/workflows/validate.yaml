@@ -1,0 +1,35 @@
+---
+name: Validate
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.31.4
+
+      - name: Install validation tools
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check yamllint==1.35.1
+          curl -fsSLo /tmp/kubeconform.tar.gz \
+            https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          sudo tar -xzf /tmp/kubeconform.tar.gz -C /usr/local/bin kubeconform
+          curl -fsSLo /tmp/hadolint \
+            https://github.com/hadolint/hadolint/releases/download/v2.12.0/hadolint-Linux-x86_64
+          sudo install -m 0755 /tmp/hadolint /usr/local/bin/hadolint
+
+      - name: Verify repository
+        run: ./scripts/verify.sh
