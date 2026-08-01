@@ -1,0 +1,17 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openai-codex-proxy
+  namespace: ai
+  labels:
+    app.kubernetes.io/name: openai-codex-proxy
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: openai-codex-proxy
+  ports:
+    - name: http
+      port: 18080
+      targetPort: http
+      protocol: TCP
