@@ -1,1 +1,10 @@
 .worktrees/
+auth.json
+auth.json.*
+*.backup
+.env
+rendered.yaml
+.DS_Store
+.idea/
+.vscode/
+*.swp

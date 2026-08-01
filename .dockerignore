@@ -1,0 +1,12 @@
+.git
+.github
+deploy
+docs
+scripts
+*.md
+LICENSE
+.env
+auth.json
+auth.json.*
+*.backup
+.DS_Store
