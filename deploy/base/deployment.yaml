@@ -39,6 +39,7 @@ spec:
                 fi
                 cp /bootstrap/auth.json /data/auth.json
               fi
+              chown 0:0 /data/auth.json
               chmod 0600 /data/auth.json
               chown 10001:10001 /data/auth.json
           securityContext:
