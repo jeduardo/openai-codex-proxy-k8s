@@ -76,11 +76,21 @@ jq -e '
   end
 ' -- "$auth_file" >/dev/null 2>&1 || fail 'auth_mode must be chatgpt when present'
 
-kubectl create namespace "$namespace" --dry-run=client -o yaml 2>/dev/null \
-  | kubectl apply -f - >/dev/null 2>&1
+umask 077
+manifest_file=
+cleanup() {
+  [ -z "$manifest_file" ] || rm -f "$manifest_file"
+}
+trap cleanup 0
+trap 'exit 1' HUP INT TERM
+manifest_file=$(mktemp "${TMPDIR:-/tmp}/codex-auth-secret-manifest.XXXXXX")
+chmod 600 "$manifest_file"
+
+kubectl create namespace "$namespace" --dry-run=client -o yaml >"$manifest_file"
+kubectl apply -f "$manifest_file" >/dev/null
 kubectl --namespace "$namespace" create secret generic codex-auth-bootstrap \
   --from-file="auth.json=$auth_file" \
-  --dry-run=client -o yaml 2>/dev/null \
-  | kubectl apply -f - >/dev/null 2>&1
+  --dry-run=client -o yaml >"$manifest_file"
+kubectl apply -f "$manifest_file" >/dev/null
 
 printf 'Codex authentication Secret is ready in namespace %s.\n' "$namespace"

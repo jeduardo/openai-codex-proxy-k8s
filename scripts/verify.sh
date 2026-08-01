@@ -52,7 +52,10 @@ cleanup() {
 trap cleanup 0
 trap 'exit 1' HUP INT TERM
 
-yamllint .github deploy .yamllint.yaml
+yamllint deploy .yamllint.yaml
+if [ -d .github ]; then
+  yamllint .github
+fi
 kubectl kustomize deploy/base >"$rendered_file"
 kubeconform -strict -summary "$rendered_file"
 shellcheck scripts/*.sh
