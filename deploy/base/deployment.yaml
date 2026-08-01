@@ -37,7 +37,11 @@ spec:
                   echo "No persisted auth.json or bootstrap credential found" >&2
                   exit 1
                 fi
-                cp /bootstrap/auth.json /data/auth.json
+                rm -f /data/.auth.json.bootstrap.tmp
+                cp /bootstrap/auth.json /data/.auth.json.bootstrap.tmp
+                chmod 0600 /data/.auth.json.bootstrap.tmp
+                chown 10001:10001 /data/.auth.json.bootstrap.tmp
+                mv /data/.auth.json.bootstrap.tmp /data/auth.json
               fi
               chown 0:0 /data/auth.json
               chmod 0600 /data/auth.json

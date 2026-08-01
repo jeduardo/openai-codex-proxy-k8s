@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: Secret
 metadata:
-  name: codex-proxy-api-key
+  name: codex-proxy-api-key-example
   namespace: ai
 type: Opaque
 stringData:
