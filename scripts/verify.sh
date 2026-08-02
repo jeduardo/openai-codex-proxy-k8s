@@ -45,9 +45,10 @@ if [ "$build" = true ]; then
   command -v docker >/dev/null 2>&1 || fail 'required command not found: docker'
 fi
 
-rendered_file=$(mktemp "${TMPDIR:-/tmp}/codex-proxy-rendered.XXXXXX")
+rendered_dir=$(mktemp -d "${TMPDIR:-/tmp}/codex-proxy-rendered.XXXXXX")
+rendered_file="$rendered_dir/rendered.yaml"
 cleanup() {
-  rm -f "$rendered_file"
+  rm -rf "$rendered_dir"
 }
 trap cleanup 0
 trap 'exit 1' HUP INT TERM
@@ -57,7 +58,14 @@ if [ -d .github ]; then
   yamllint .github
 fi
 kubectl kustomize deploy/base >"$rendered_file"
-kubeconform -strict -summary "$rendered_file"
+if ! kubeconform_output=$(kubeconform -strict -summary "$rendered_file" 2>&1); then
+  printf '%s\n' "$kubeconform_output" >&2
+  fail 'schema validation failed'
+fi
+printf '%s\n' "$kubeconform_output"
+printf '%s\n' "$kubeconform_output" \
+  | grep -q 'Summary: [1-9][0-9]* resource' \
+  || fail 'schema validation processed zero resources'
 shellcheck scripts/*.sh
 hadolint Dockerfile
 
