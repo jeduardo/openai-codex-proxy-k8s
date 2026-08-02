@@ -318,15 +318,15 @@ A manual `age` backup can stream the live file directly into encryption without 
 umask 077
 set -o pipefail
 AGE_RECIPIENT='age1REPLACE_WITH_YOUR_RECIPIENT'
-backup_tmp=$(mktemp "${TMPDIR:-/tmp}/auth.json.backup.age.XXXXXX")
+backup_tmp=$(mktemp './.auth.json.backup.age.XXXXXX')
 trap 'rm -f "$backup_tmp"' EXIT
 
 if kubectl -n ai exec deployment/openai-codex-proxy -c proxy -- \
   cat /var/lib/codex/auth.json \
   | age --recipient "$AGE_RECIPIENT" --output "$backup_tmp" \
-  && test -s "$backup_tmp"; then
-  chmod 600 "$backup_tmp"
-  mv -- "$backup_tmp" auth.json.backup.age
+  && test -s "$backup_tmp" \
+  && chmod 600 "$backup_tmp" \
+  && mv -- "$backup_tmp" auth.json.backup.age; then
   trap - EXIT
 else
   echo "Backup failed; auth.json.backup.age was not replaced" >&2
@@ -349,6 +349,9 @@ If refresh is permanently rejected:
 5. Start the Deployment. The init container seeds the new file and fixes its ownership.
 
 ```bash
+# Run this entire block with Bash.
+set -e
+
 ./scripts/bootstrap-auth-secret.sh \
   --namespace ai \
   --file "$HOME/.codex/auth.json"
