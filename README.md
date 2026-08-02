@@ -176,7 +176,7 @@ An unlabelled pod should be denied by an enforcing CNI. Test the local health en
 
 ```bash
 kubectl -n ai run codex-health-check \
-  --rm --restart=Never \
+  --rm --attach=true --restart=Never \
   --image=curlimages/curl:8.12.1 \
   --labels='openai-codex-proxy-client=true' \
   --command -- \
@@ -312,18 +312,29 @@ The Deployment must remain at one replica with `Recreate`. The init container wi
 
 Prefer encrypted volume snapshots or an encrypted Kubernetes backup system with tightly restricted access. The PVC backup contains active account credentials; encrypt backups in transit and at rest, protect encryption keys separately, define retention, and test restoration privately.
 
-A manual `age` backup can stream the live file directly into encryption without writing plaintext to disk:
+A manual `age` backup can stream the live file directly into encryption without writing plaintext to disk. This command requires Bash:
 
 ```bash
 umask 077
+set -o pipefail
 AGE_RECIPIENT='age1REPLACE_WITH_YOUR_RECIPIENT'
-kubectl -n ai exec deployment/openai-codex-proxy -c proxy -- \
+backup_tmp=$(mktemp "${TMPDIR:-/tmp}/auth.json.backup.age.XXXXXX")
+trap 'rm -f "$backup_tmp"' EXIT
+
+if kubectl -n ai exec deployment/openai-codex-proxy -c proxy -- \
   cat /var/lib/codex/auth.json \
-  | age --recipient "$AGE_RECIPIENT" --output auth.json.backup.age
-chmod 600 auth.json.backup.age
+  | age --recipient "$AGE_RECIPIENT" --output "$backup_tmp" \
+  && test -s "$backup_tmp"; then
+  chmod 600 "$backup_tmp"
+  mv -- "$backup_tmp" auth.json.backup.age
+  trap - EXIT
+else
+  echo "Backup failed; auth.json.backup.age was not replaced" >&2
+  exit 1
+fi
 ```
 
-Use a real, verified recipient and store the decryption identity separately. Never leave an unencrypted `auth.json.backup`. Automatic synchronization of refreshed credentials back to a Secret is intentionally out of scope because it would require Kubernetes write access and create additional compromise and race risks.
+Use a real, verified recipient and store the decryption identity separately. Verify that the backup decrypts with the operator's identity before relying on it or deleting PVC state. Never leave an unencrypted `auth.json.backup`. Automatic synchronization of refreshed credentials back to a Secret is intentionally out of scope because it would require Kubernetes write access and create additional compromise and race risks.
 
 ## Refresh-token rotation and recovery
 
@@ -385,6 +396,8 @@ kubectl -n ai delete pod codex-auth-recovery
 kubectl -n ai scale deployment/openai-codex-proxy --replicas=1
 kubectl -n ai rollout status deployment/openai-codex-proxy
 ```
+
+If any command fails after scale-down, inspect and delete `pod/codex-auth-recovery` as needed, and keep the proxy stopped until the PVC state is understood. After resolving the failure, explicitly restore service with `kubectl -n ai scale deployment/openai-codex-proxy --replicas=1`.
 
 Then repeat the authenticated model and Responses checks. If the account itself may be compromised, also use the provider's account/session controls and follow the rotation response in [SECURITY.md](SECURITY.md).
 
