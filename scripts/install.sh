@@ -104,11 +104,9 @@ fi
 
 umask 077
 overlay_dir=
-rendered_file=
 api_key_file=
 cleanup() {
   [ -z "$api_key_file" ] || rm -f "$api_key_file"
-  [ -z "$rendered_file" ] || rm -f "$rendered_file"
   [ -z "$overlay_dir" ] || rm -rf "$overlay_dir"
 }
 trap cleanup 0
@@ -131,10 +129,8 @@ mkdir -p "$repo_root/deploy/overlays"
 overlay_dir=$(mktemp -d "$repo_root/deploy/overlays/.install-XXXXXX")
 chmod 700 "$overlay_dir"
 cat >"$overlay_dir/kustomization.yaml" <<EOF
----
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-namespace: $namespace
 resources:
   - ../../base
 images:
@@ -142,15 +138,13 @@ images:
     newName: ghcr.io/jeduardo/openai-codex-proxy-k8s
     newTag: $image_tag
 EOF
-rendered_file=$(mktemp "${TMPDIR:-/tmp}/openai-codex-proxy-rendered.XXXXXX")
-chmod 600 "$rendered_file"
 printf 'Rendering Kubernetes manifests...\n' >&2
-kubectl kustomize "$overlay_dir" >"$rendered_file"
+kubectl kustomize "$overlay_dir" >/dev/null
 printf 'Applying Kubernetes manifests...\n' >&2
-kubectl apply -f "$rendered_file" >&2
+kubectl apply -k "$overlay_dir" >&2
 printf 'Waiting for deployment rollout...\n' >&2
 if ! kubectl --namespace "$namespace" rollout status deployment/openai-codex-proxy --timeout=180s >&2; then
-  printf 'Deployment rollout failed; inspect the deployment and Pod events. Cluster resources were left unchanged.\n' >&2
+  printf 'Deployment rollout failed; inspect workload resources and Pod events. Secrets and PVC are left intact/in place for troubleshooting; no cleanup/deletion was performed.\n' >&2
   exit 1
 fi
 printf 'Installed openai-codex-proxy in namespace %s using ghcr.io/jeduardo/openai-codex-proxy-k8s:%s.\n' "$namespace" "$image_tag" >&2
