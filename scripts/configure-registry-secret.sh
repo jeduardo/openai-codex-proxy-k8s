@@ -68,11 +68,14 @@ done
 
 umask 077
 tmpdir=
+terminal_state=
 terminal_echo_disabled=false
 
 restore_terminal() {
-  if [ "$terminal_echo_disabled" = true ]; then
-    stty echo >/dev/null 2>&1 || :
+  if [ "${terminal_echo_disabled-false}" = true ]; then
+    if [ -n "${terminal_state-}" ]; then
+      stty "$terminal_state" >/dev/null 2>&1 || :
+    fi
     terminal_echo_disabled=false
   fi
 }
@@ -89,8 +92,9 @@ token=${GHCR_TOKEN-}
 if [ -z "$token" ]; then
   [ -t 0 ] || fail 'GHCR_TOKEN is required for noninteractive execution'
   printf 'GHCR token: ' >&2
-  stty -echo
+  terminal_state=$(stty -g)
   terminal_echo_disabled=true
+  stty -echo
   if ! IFS= read -r token; then
     printf '\n' >&2
     fail 'unable to read GHCR_TOKEN from terminal'
