@@ -66,6 +66,10 @@ printf '%s\n' "$kubeconform_output"
 printf '%s\n' "$kubeconform_output" \
   | grep -q 'Summary: [1-9][0-9]* resource' \
   || fail 'schema validation processed zero resources'
+grep -q '^[[:space:]]*imagePullSecrets:' "$rendered_file" \
+  || fail 'rendered deployment is missing imagePullSecrets'
+grep -q '^[[:space:]]*-[[:space:]]*name:[[:space:]]*ghcr-pull-secret[[:space:]]*$' "$rendered_file" \
+  || fail 'rendered deployment is missing ghcr-pull-secret'
 shellcheck scripts/*.sh
 hadolint Dockerfile
 

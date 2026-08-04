@@ -4,6 +4,7 @@ auth.json.*
 *.backup
 .env
 rendered.yaml
+deploy/overlays/.install-*/
 .DS_Store
 .idea/
 .vscode/

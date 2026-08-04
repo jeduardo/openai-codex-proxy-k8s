@@ -19,6 +19,8 @@ spec:
         app.kubernetes.io/name: openai-codex-proxy
     spec:
       automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: ghcr-pull-secret
       securityContext:
         fsGroup: 10001
         fsGroupChangePolicy: OnRootMismatch
