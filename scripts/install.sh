@@ -132,6 +132,7 @@ mkdir -p "$repo_root/deploy/overlays"
 overlay_dir=$(mktemp -d "$repo_root/deploy/overlays/.install-XXXXXX")
 chmod 700 "$overlay_dir"
 cat >"$overlay_dir/kustomization.yaml" <<EOF
+---
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: $namespace
