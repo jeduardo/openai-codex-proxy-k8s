@@ -57,6 +57,45 @@ docker buildx build \
 
 Use a registry the cluster can pull from, or import the local image into every node that might run the pod. Never add `auth.json`, API keys, or other credentials to the build context or image.
 
+## Install the private GHCR image
+
+Published images are private at `ghcr.io/jeduardo/openai-codex-proxy-k8s`. Create a GitHub token limited to the package's **`read:packages`** permission. This registry token is distinct from both the Codex OAuth credential in `auth.json` and the proxy API key; do not substitute one for another.
+
+For a new namespace, create it before the installer creates its runtime Secrets:
+
+```bash
+kubectl create namespace ai --dry-run=client -o yaml | kubectl apply -f -
+```
+
+The interactive installer confirms the current Kubernetes context, prompts for the GitHub token without echoing it, creates `ghcr-pull-secret`, creates the Codex and proxy-key Secrets, renders the image overlay, and waits for the rollout. Use an immutable published version or Git SHA tag, not `main`:
+
+```bash
+./scripts/install.sh \
+  --ghcr-username GITHUB_USERNAME \
+  --image-tag sha-REPLACE_WITH_COMMIT_SHA
+```
+
+For automation, supply the token through the protected `GHCR_TOKEN` environment variable and use `--yes` to skip the context prompt. Do not put the token on a command line as an argument or enable shell tracing:
+
+```bash
+GHCR_TOKEN=REDACTED ./scripts/install.sh \
+  --ghcr-username GITHUB_USERNAME \
+  --image-tag sha-REPLACE_WITH_COMMIT_SHA \
+  --yes
+```
+
+`ghcr-pull-secret` is an image-pull credential consumed by the kubelet only; it is not mounted into the application container. To rotate the GitHub token, create a replacement least-privilege token, update the Secret, and restart the Deployment so nodes pull with the new credential:
+
+```bash
+GHCR_TOKEN=REDACTED ./scripts/configure-registry-secret.sh \
+  --namespace ai \
+  --username GITHUB_USERNAME
+kubectl -n ai rollout restart deployment/openai-codex-proxy
+kubectl -n ai rollout status deployment/openai-codex-proxy
+```
+
+If a pod reports `ImagePullBackOff`, use `kubectl -n ai describe pod POD_NAME` to inspect the image-pull event without printing Secret data. Confirm that `ghcr-pull-secret` exists in the pod namespace, is configured for `ghcr.io`, and was created with a non-expired token authorized for `read:packages`; then recreate it with `configure-registry-secret.sh` and restart the rollout. Confirm that the requested immutable tag exists before falling back to no tag or to `main`.
+
 ## Authenticate and create Secrets
 
 ### 1. Log in on a trusted workstation
@@ -130,7 +169,18 @@ kubectl -n ai rollout status deployment/openai-codex-proxy
 
 Replace the placeholder tag with a published immutable tag. If using another registry or a locally loaded image, change `newName` and `newTag`. Keep private overlay values under appropriate configuration control.
 
-The base can be applied directly for evaluation with `kubectl apply -k deploy/base`, but that deploys `:main` and is not the recommended immutable production workflow. Resource requests and limits are starting points, not performance guarantees.
+### Manual deployment
+
+Manual Kustomize deployment remains supported, but it also requires `ghcr-pull-secret` in the target namespace before the Deployment can pull the private image. Create it with `configure-registry-secret.sh` (the script prompts interactively when `GHCR_TOKEN` is unset), then apply an overlay with an immutable tag:
+
+```bash
+./scripts/configure-registry-secret.sh \
+  --namespace ai \
+  --username GITHUB_USERNAME
+kubectl apply -k deploy/overlays/private
+```
+
+The base can be applied directly for evaluation with `kubectl apply -k deploy/base` only after that pull Secret exists, but it deploys `:main` and is not the recommended immutable production workflow. Resource requests and limits are starting points, not performance guarantees.
 
 ### Storage on k3s
 

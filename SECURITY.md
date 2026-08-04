@@ -20,11 +20,13 @@ General upstream application vulnerabilities should also be reported privately t
 
 - **Codex OAuth credentials:** `auth.json` contains access, ID, and refresh tokens plus account metadata. A valid refresh token can provide continuing account access within the provider's authorization scope.
 - **Live PVC state:** `codex-auth` is the authoritative, writable credential after refresh-token rotation. It may be newer and more valuable than the bootstrap Secret.
-- **Kubernetes Secrets:** `codex-auth-bootstrap` seeds the first credential; `codex-proxy-api-key` authenticates clients. Secret data is base64-encoded unless the cluster separately enables encryption at rest.
+- **Kubernetes Secrets:** `codex-auth-bootstrap` seeds the first credential; `codex-proxy-api-key` authenticates clients; and `ghcr-pull-secret` gives kubelets access to the private image. Secret data is base64-encoded unless the cluster separately enables encryption at rest.
+- **GHCR token:** the registry token needs only GitHub `read:packages` for `ghcr.io/jeduardo/openai-codex-proxy-k8s`. It is distinct from Codex OAuth credentials and the proxy API key. `ghcr-pull-secret` is used for image pulls and must not be mounted into the application.
 - **Authorized clients:** a client with the NetworkPolicy label and proxy key can spend account quota and submit/read API content. The label alone is not authentication, and the proxy key does not isolate users from one another.
 - **Proxy pod:** compromise of the application process can expose its API key environment value, mounted live OAuth credential, request/response content, and writable PVC state.
-- **Cluster nodes:** root or equivalent access to a node may expose pod memory, container runtime data, mounted volumes, traffic, and Secrets delivered to workloads.
-- **Cluster and namespace administrators:** principals able to read Secrets, exec into pods, create PVC-mounted pods, mutate workloads, label pods, or change NetworkPolicy are trusted with the protected data. Cluster-admin access is effectively full compromise of this deployment.
+- **Cluster nodes:** root or equivalent access to a node may expose pod memory, container runtime data, mounted volumes, traffic, and image-pull credentials delivered to kubelets.
+- **Cluster and namespace administrators:** principals able to read Secrets (including `ghcr-pull-secret`), exec into pods, create PVC-mounted pods, mutate workloads, label pods, or change NetworkPolicy are trusted with the protected data. Cluster-admin access is effectively full compromise of this deployment.
+- **Backup and Secret readers:** anyone who can read Kubernetes Secret data, nodes, container-runtime state, or backups containing those assets crosses the credential boundary. Restrict each of these readers to trusted administrators.
 
 The controls here reduce accidental exposure and contain ordinary workload compromise. They do not defend against a malicious cluster administrator, compromised node/root, compromised provider, or fully compromised authorized client. NetworkPolicy is not a firewall when the CNI does not enforce it, and standard Kubernetes NetworkPolicy cannot restrict destinations by FQDN.
 
@@ -41,12 +43,13 @@ Operators must:
 7. Enable Kubernetes API-data encryption at rest, encrypted etcd/datastore backups, encrypted PVC backups/snapshots, restrictive RBAC, and namespace access controls.
 8. Limit Secret reads, pod exec/ephemeral-container creation, workload mutation, PVC attachment, node access, and backup access to trusted administrators.
 9. Perform Codex login only on a trusted, patched workstation. Never share or commit `auth.json`, token backups, API keys, rendered Secrets, or client configuration containing them.
-10. Use immutable reviewed image tags, verify image provenance where available, scan dependencies, and make upstream version changes explicit.
-11. Keep service-account token automounting disabled. The proxy needs no Kubernetes API permissions; do not grant it a Role or RoleBinding.
-12. Preserve the non-root application security context, read-only root filesystem, dropped capabilities, disabled privilege escalation, RuntimeDefault seccomp, and writable mounts only for `/tmp` and the credential PVC.
-13. Keep the bootstrap Secret mount read-only and the live file mode `0600`. Do not use a projected Secret as the live refreshable file.
-14. Prevent secrets from reaching logs, tracing, metrics, shell history, CI artifacts, support tickets, crash dumps, or terminal recordings. Never enable shell tracing around secret operations.
-15. Define encrypted backup retention, restoration tests, incident contacts, and deletion procedures. Remember that deleting a Secret or PVC does not remove copies from snapshots, datastore backups, clients, or provider sessions.
+10. Use immutable reviewed image tags rather than `main`, verify image provenance where available, scan dependencies, and make upstream version changes explicit.
+11. Create the GHCR credential with only GitHub `read:packages`. Never pass that token as a CLI argument, write it to logs, mount `ghcr-pull-secret` into the application, or commit it to source control; it is a kubelet-only image-pull credential.
+12. Keep service-account token automounting disabled. The proxy needs no Kubernetes API permissions; do not grant it a Role or RoleBinding.
+13. Preserve the non-root application security context, read-only root filesystem, dropped capabilities, disabled privilege escalation, RuntimeDefault seccomp, and writable mounts only for `/tmp` and the credential PVC.
+14. Keep the bootstrap Secret mount read-only and the live file mode `0600`. Do not use a projected Secret as the live refreshable file.
+15. Prevent secrets from reaching logs, tracing, metrics, shell history, CI artifacts, support tickets, crash dumps, or terminal recordings. Never enable shell tracing around secret operations.
+16. Define encrypted backup retention, restoration tests, incident contacts, and deletion procedures. Remember that deleting a Secret or PVC does not remove copies from snapshots, datastore backups, clients, or provider sessions.
 
 Anyone allowed to add the client label can attempt network access, so bearer authentication remains mandatory. Conversely, possession of the bearer key does not bypass NetworkPolicy when it is enforced.
 
@@ -77,6 +80,19 @@ This root-plus-`CHOWN` exception must remain limited to the init container. It i
 
 4. Update authorized clients through approved secret distribution and invalidate/remove old copies.
 5. Review access logs and account usage without printing authorization headers or request secrets.
+
+### GHCR token or pull Secret exposure
+
+1. Revoke the exposed GitHub token and create a replacement limited to `read:packages`.
+2. Replace `ghcr-pull-secret` with `GHCR_TOKEN` using `./scripts/configure-registry-secret.sh --namespace ai --username GITHUB_USERNAME`; do not pass the token as a CLI argument or record it in logs.
+3. Restart and observe the rollout so nodes use the replacement image-pull credential:
+
+   ```bash
+   kubectl -n ai rollout restart deployment/openai-codex-proxy
+   kubectl -n ai rollout status deployment/openai-codex-proxy
+   ```
+
+4. Review Secret-reader, node, container-runtime, and backup access because each may retain or expose the old credential.
 
 ### OAuth, bootstrap Secret, or PVC exposure
 
