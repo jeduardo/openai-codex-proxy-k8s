@@ -73,6 +73,9 @@ done
 case $image_tag in
   *[![:print:]]*|*[[:space:]]*|*/*|*..*) fail '--image-tag must not contain whitespace, /, or ..' ;;
 esac
+if [ "$image_tag" = main ]; then
+  printf 'Warning: image tag "main" is mutable; immutable Git SHA or version tags are preferred.\n' >&2
+fi
 if [ -z "$auth_file" ]; then
   [ -n "${HOME-}" ] || fail 'HOME is not set; specify --auth-file PATH'
   auth_file=$HOME/.codex/auth.json
@@ -131,6 +134,7 @@ chmod 700 "$overlay_dir"
 cat >"$overlay_dir/kustomization.yaml" <<EOF
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+namespace: $namespace
 resources:
   - ../../base
 images:

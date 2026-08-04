@@ -513,15 +513,16 @@ kubectl -n ai delete service openai-codex-proxy
 kubectl -n ai delete networkpolicy openai-codex-proxy
 ```
 
-This intentionally leaves the `ai` Namespace, `codex-auth` PVC, and both runtime Secrets.
+This intentionally leaves the `ai` Namespace, `codex-auth` PVC, and all three runtime Secrets: `ghcr-pull-secret`, `codex-auth-bootstrap`, and `codex-proxy-api-key`.
 
 > [!DANGER]
-> **Do not use `kubectl delete -k deploy/base` when you intend to preserve credentials.** The base includes the Namespace, PVC, and workload resources. Deleting it can delete `codex-auth`, both Secrets through Namespace cascading deletion, and any unrelated resources that also live in the shared `ai` namespace. It can therefore destroy the newest rotated credential state and unrelated `ai` workloads.
+> **Do not use `kubectl delete -k deploy/base` when you intend to preserve credentials.** The base includes the Namespace, PVC, and workload resources. Deleting it can delete `codex-auth`, all three Secrets (`ghcr-pull-secret`, `codex-auth-bootstrap`, and `codex-proxy-api-key`) through Namespace cascading deletion, and any unrelated resources that also live in the shared `ai` namespace. It can therefore destroy the newest rotated credential state and unrelated `ai` workloads.
 
 When credential destruction is explicitly intended and verified backups have also been handled, delete it separately:
 
 ```bash
 kubectl -n ai delete pvc codex-auth
+kubectl -n ai delete secret ghcr-pull-secret
 kubectl -n ai delete secret codex-auth-bootstrap
 kubectl -n ai delete secret codex-proxy-api-key
 ```
