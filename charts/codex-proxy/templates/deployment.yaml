@@ -64,7 +64,7 @@ spec:
             - name: OPENAI_VIA_CODEX_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.apiKey.existingSecret }}
+                  name: {{ default (printf "%s-api-key" (include "codex-proxy.fullname" .)) .Values.apiKey.existingSecret }}
                   key: {{ .Values.apiKey.secretKey }}
           ports:
             - name: http

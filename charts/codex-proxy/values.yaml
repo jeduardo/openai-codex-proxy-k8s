@@ -8,8 +8,9 @@ auth:
   secretKey: auth.json
 
 apiKey:
-  existingSecret: codex-proxy-api-key
+  existingSecret: ""
   secretKey: api-key
+  generate: true
 
 service:
   port: 18080

@@ -6,19 +6,18 @@ The upstream service is unofficial and uses a ChatGPT/Codex login. Keep it on a 
 
 ## Prepare secrets
 
-Create a Secret containing a valid Codex `auth.json` and another containing the incoming API key. The live credential is copied from the first Secret to a writable PVC and may be refreshed in place.
+Create a Secret containing a valid Codex `auth.json`. The live credential is copied from it to a writable PVC and may be refreshed in place. The chart generates and preserves the proxy API-key Secret unless `apiKey.existingSecret` is set.
 
 ```bash
 kubectl create namespace ai --dry-run=client -o yaml | kubectl apply -f -
 kubectl -n ai create secret generic codex-auth-bootstrap --from-file=auth.json="$HOME/.codex/auth.json"
-openssl rand -hex 32 | kubectl -n ai create secret generic codex-proxy-api-key --from-file=api-key=/dev/stdin
 ```
 
-Do not print these Secret values. A Kubernetes Secret volume cannot be used as the live auth file because the upstream process refreshes it.
+Do not print the Secret value. A Kubernetes Secret volume cannot be used as the live auth file because the upstream process refreshes it.
 
 ## Install
 
-The chart uses the upstream public multi-platform image by default:
+The chart uses the upstream public multi-platform image by default and generates the proxy API key:
 
 ```bash
 helm upgrade --install codex-proxy ./charts/codex-proxy --namespace ai --create-namespace
