@@ -22,7 +22,11 @@ The chart copies that file to a writable PVC. The proxy can then refresh it in p
 Install the chart in the namespace you want. The examples use `ai`; change the `--namespace` value for another namespace. The chart generates and preserves the proxy API key unless you set `apiKey.existingSecret`.
 
 ```bash
-helm upgrade --install codex-proxy ./charts/codex-proxy --namespace ai --create-namespace
+helm upgrade --install codex-proxy \
+  oci://ghcr.io/jeduardo/codex-proxy \
+  --version 0.2.0 \
+  --namespace ai \
+  --create-namespace
 ```
 
 For a Gateway API route, supply cluster-specific values in a private values file:
@@ -81,6 +85,20 @@ If you set `apiKey.existingSecret`, use that Secret name instead.
 curl https://proxy.example.internal/v1/models -H "Authorization: Bearer $OPENAI_API_KEY"
 ```
 
+Send an inference request through the proxy:
+
+```bash
+curl https://proxy.example.internal/v1/chat/completions \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5.5",
+    "messages": [
+      {"role": "user", "content": "Tell me a haiku about DNS."}
+    ]
+  }'
+```
+
 ## Operations
 
 Keep one replica and `Recreate`. Do not attach an HPA or delete the PVC during a normal upgrade. If the refresh token is revoked, log in again, replace the bootstrap Secret, remove the stale `auth.json` from the PVC with a temporary non-root pod, and restart the Deployment.
@@ -89,7 +107,7 @@ Back up the PVC only with encrypted storage and restricted access. It contains t
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the resources the chart creates and how credentials move through the deployment.
 
-See [docs/CI.md](docs/CI.md) for validation, Renovate, and workflow cleanup. See [docs/RELEASING.md](docs/RELEASING.md) for chart versioning and the planned OCI release process.
+See [docs/CI.md](docs/CI.md) for validation, Renovate, and workflow cleanup. See [docs/RELEASING.md](docs/RELEASING.md) for chart versioning and the OCI release process.
 
 ## Validate
 
