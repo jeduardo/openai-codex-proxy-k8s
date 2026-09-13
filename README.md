@@ -51,6 +51,8 @@ kubectl -n ai rollout status deployment/codex-proxy
 
 The route and gateway values are intentionally not included in the repository.
 
+The chart defaults to namespace `ai` in the examples, but the namespace is controlled by Helm. Replace `--namespace ai` with another namespace when installing elsewhere. The init and proxy containers both run as UID/GID 1000; the selected StorageClass must support the pod `fsGroup` setting.
+
 ## Use the API
 
 The Service URL inside the cluster is `http://codex-proxy.ai.svc.cluster.local:18080/v1`. Use the hostname configured in your private values file outside the cluster. Clients send the API key from `codex-proxy-api-key` as `Authorization: Bearer ...`. Pods reaching the Service must carry the label configured by `networkPolicy.clientLabel`.
