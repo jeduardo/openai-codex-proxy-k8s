@@ -1,0 +1,57 @@
+image:
+  repository: ghcr.io/hotchpotch/openai-api-server-via-codex
+  tag: v0.2.1
+  pullPolicy: IfNotPresent
+
+auth:
+  existingSecret: codex-auth-bootstrap
+  secretKey: auth.json
+
+apiKey:
+  existingSecret: ""
+  secretKey: api-key
+  generate: true
+
+service:
+  port: 18080
+
+persistence:
+  enabled: true
+  size: 32Mi
+  storageClassName: ""
+
+networkPolicy:
+  enabled: true
+  clientLabel:
+    key: openai-codex-proxy-client
+    value: "true"
+  gateway:
+    enabled: false
+    namespace: kube-system
+    podSelector:
+      matchLabels: {}
+
+route:
+  enabled: false
+  gateway:
+    name: ""
+    namespace: ""
+    sectionName: ""
+  hostname: ""
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hostname: ""
+  path: /
+  pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi

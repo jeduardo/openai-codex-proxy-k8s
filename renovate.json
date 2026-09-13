@@ -1,0 +1,41 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "labels": ["dependencies"],
+  "prConcurrentLimit": 3,
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^charts\\/codex-proxy\\/values\\.yaml$/"],
+      "matchStrings": [
+        "repository: (?<depName>ghcr\\.io\\/hotchpotch\\/openai-api-server-via-codex)\\n  tag: (?<currentValue>[^\\s]+)"
+      ],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker",
+      "groupName": "upstream Codex proxy"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^charts\\/codex-proxy\\/Chart\\.yaml$/"],
+      "matchStrings": ["appVersion: (?<currentValue>[^\\s]+)"],
+      "depNameTemplate": "ghcr.io/hotchpotch/openai-api-server-via-codex",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker",
+      "groupName": "upstream Codex proxy"
+    }
+  ],
+  "packageRules": [
+    {
+      "matchPackageNames": ["ghcr.io/hotchpotch/openai-api-server-via-codex"],
+      "matchUpdateTypes": ["major"],
+      "enabled": true
+    },
+    {
+      "matchPackageNames": ["ghcr.io/hotchpotch/openai-api-server-via-codex"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "platformAutomerge": true,
+      "automergeType": "pr"
+    }
+  ]
+}

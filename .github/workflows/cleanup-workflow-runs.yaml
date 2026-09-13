@@ -1,0 +1,37 @@
+name: Clean up workflow runs
+
+on:
+  schedule:
+    - cron: "43 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Keep the five newest runs for each workflow
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          gh workflow list --repo "$GH_REPO" --all --json id --jq '.[].id' \
+            | while read -r workflow_id; do
+                gh run list \
+                  --repo "$GH_REPO" \
+                  --workflow "$workflow_id" \
+                  --all \
+                  --limit 100 \
+                  --json databaseId \
+                  --jq '.[5:][] | .databaseId' \
+                  | while read -r run_id; do
+                      gh api --method DELETE \
+                        "/repos/$GH_REPO/actions/runs/$run_id"
+                      echo "Deleted workflow run $run_id"
+                    done
+              done

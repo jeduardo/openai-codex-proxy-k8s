@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "codex-proxy.fullname" . }}
+  labels:
+    {{- include "codex-proxy.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "codex-proxy.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "codex-proxy.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: bootstrap-auth
+          image: busybox:1.36.1
+          command: ["/bin/sh", "-c"]
+          args:
+            - >-
+              set -eu;
+              if [ ! -s /data/auth.json ]; then
+                test -s /bootstrap/auth.json;
+                cp /bootstrap/auth.json /data/.auth.json.tmp;
+                chown 1000:1000 /data/.auth.json.tmp;
+                chmod 0600 /data/.auth.json.tmp;
+                mv /data/.auth.json.tmp /data/auth.json;
+              fi;
+              chown 1000:1000 /data/auth.json;
+              chmod 0600 /data/auth.json
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: auth-data
+              mountPath: /data
+            - name: auth-bootstrap
+              mountPath: /bootstrap
+              readOnly: true
+      containers:
+        - name: proxy
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: OPENAI_VIA_CODEX_AUTH_JSON
+              value: /home/app/.codex/auth.json
+            - name: OPENAI_VIA_CODEX_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default (printf "%s-api-key" (include "codex-proxy.fullname" .)) .Values.apiKey.existingSecret }}
+                  key: {{ .Values.apiKey.secretKey }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: auth-data
+              mountPath: /home/app/.codex
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: auth-data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "codex-proxy.fullname" . }}-auth
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: auth-bootstrap
+          secret:
+            secretName: {{ .Values.auth.existingSecret }}
+        - name: tmp
+          emptyDir: {}

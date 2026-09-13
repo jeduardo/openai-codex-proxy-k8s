@@ -1,0 +1,27 @@
+{{- if .Values.route.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "codex-proxy.fullname" . }}
+  labels:
+    {{- include "codex-proxy.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    - name: {{ required "route.gateway.name is required when route.enabled" .Values.route.gateway.name }}
+      {{- with .Values.route.gateway.namespace }}
+      namespace: {{ . }}
+      {{- end }}
+      {{- with .Values.route.gateway.sectionName }}
+      sectionName: {{ . }}
+      {{- end }}
+  hostnames:
+    - {{ required "route.hostname is required when route.enabled" .Values.route.hostname }}
+  rules:
+    - backendRefs:
+        - name: {{ include "codex-proxy.fullname" . }}
+          port: {{ .Values.service.port }}
+      matches:
+        - path:
+            type: PathPrefix
+            value: /
+{{- end }}
