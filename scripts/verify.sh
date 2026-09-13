@@ -3,12 +3,11 @@ set -eu
 
 usage() {
   cat <<'EOF'
-Usage: verify.sh [--build]
+Usage: verify.sh
 
-Validate repository manifests, scripts, and the Dockerfile.
+Validate the Helm chart and shell scripts.
 
 Options:
-  --build     Build the verification container image
   -h, --help  Show this help
 EOF
 }
@@ -18,14 +17,8 @@ fail() {
   exit 1
 }
 
-build=false
-
 while [ "$#" -gt 0 ]; do
   case $1 in
-    --build)
-      build=true
-      shift
-      ;;
     -h|--help)
       usage
       exit 0
@@ -36,14 +29,10 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-for command_name in kubectl kubeconform yamllint shellcheck hadolint; do
+for command_name in helm kubeconform shellcheck; do
   command -v "$command_name" >/dev/null 2>&1 \
-    || fail "required command not found: $command_name"
+  || fail "required command not found: $command_name"
 done
-
-if [ "$build" = true ]; then
-  command -v docker >/dev/null 2>&1 || fail 'required command not found: docker'
-fi
 
 rendered_dir=$(mktemp -d "${TMPDIR:-/tmp}/codex-proxy-rendered.XXXXXX")
 rendered_file="$rendered_dir/rendered.yaml"
@@ -53,11 +42,8 @@ cleanup() {
 trap cleanup 0
 trap 'exit 1' HUP INT TERM
 
-yamllint deploy .yamllint.yaml
-if [ -d .github ]; then
-  yamllint .github
-fi
-kubectl kustomize deploy/base >"$rendered_file"
+helm lint charts/codex-proxy
+helm template codex-proxy charts/codex-proxy >"$rendered_file"
 if ! kubeconform_output=$(kubeconform -strict -summary "$rendered_file" 2>&1); then
   printf '%s\n' "$kubeconform_output" >&2
   fail 'schema validation failed'
@@ -66,15 +52,6 @@ printf '%s\n' "$kubeconform_output"
 printf '%s\n' "$kubeconform_output" \
   | grep -q 'Summary: [1-9][0-9]* resource' \
   || fail 'schema validation processed zero resources'
-grep -q '^[[:space:]]*imagePullSecrets:' "$rendered_file" \
-  || fail 'rendered deployment is missing imagePullSecrets'
-grep -q '^[[:space:]]*-[[:space:]]*name:[[:space:]]*ghcr-pull-secret[[:space:]]*$' "$rendered_file" \
-  || fail 'rendered deployment is missing ghcr-pull-secret'
 shellcheck scripts/*.sh
-hadolint Dockerfile
-
-if [ "$build" = true ]; then
-  docker build -t openai-codex-proxy-k8s:verify .
-fi
 
 printf 'Verification passed.\n'

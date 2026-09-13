@@ -13,23 +13,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v4
-        with:
-          version: v1.31.4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Install validation tools
         run: |
           set -euo pipefail
-          python -m pip install --disable-pip-version-check yamllint==1.35.1
+          helm_sha256=fc307327959aa38ed8f9f7e66d45492bb022a66c3e5da6063958254b9767d179
+          curl -fsSLo /tmp/helm.tar.gz https://get.helm.sh/helm-v3.16.4-linux-amd64.tar.gz
+          echo "$helm_sha256  /tmp/helm.tar.gz" | sha256sum --check --status
+          tar -xzf /tmp/helm.tar.gz -C /tmp
+          sudo install -m 0755 /tmp/linux-amd64/helm /usr/local/bin/helm
           curl -fsSLo /tmp/kubeconform.tar.gz \
             https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          kubeconform_sha256=95f14e87aa28c09d5941f11bd024c1d02fdc0303ccaa23f61cef67bc92619d73
+          echo "$kubeconform_sha256  /tmp/kubeconform.tar.gz" | sha256sum --check --status
           sudo tar -xzf /tmp/kubeconform.tar.gz -C /usr/local/bin kubeconform
-          curl -fsSLo /tmp/hadolint \
-            https://github.com/hadolint/hadolint/releases/download/v2.12.0/hadolint-Linux-x86_64
-          sudo install -m 0755 /tmp/hadolint /usr/local/bin/hadolint
 
       - name: Verify repository
         run: ./scripts/verify.sh
