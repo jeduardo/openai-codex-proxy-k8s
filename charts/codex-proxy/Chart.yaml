@@ -2,7 +2,7 @@ apiVersion: v2
 name: codex-proxy
 description: OpenAI-compatible Codex proxy backed by a ChatGPT Codex login
 type: application
-version: 0.1.0
+version: 0.2.0
 appVersion: v0.2.1
 annotations:
   artifacthub.io/license: MIT
