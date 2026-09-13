@@ -48,7 +48,7 @@ jobs:
           fi
           case "$release_tag" in
             codex-proxy-v*) ;;
-            *) echo "No codex-proxy release tag found" >&2; exit 1 ;;
+            *) echo "No codex-proxy release tag found; nothing to publish"; exit 0 ;;
           esac
           chart_version=$(helm show chart charts/codex-proxy | awk '$1 == "version:" { print $2 }')
           test -n "$chart_version"
