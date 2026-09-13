@@ -1,0 +1,32 @@
+name: Publish Helm chart
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    if: startsWith(github.event.release.tag_name, 'codex-proxy-v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Log in to GHCR
+        env:
+          CR_PAT: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$CR_PAT" | helm registry login ghcr.io --username "${{ github.actor }}" --password-stdin
+
+      - name: Package and publish chart
+        run: |
+          set -euo pipefail
+          chart_version=$(helm show chart charts/codex-proxy | awk '$1 == "version:" { print $2 }')
+          test -n "$chart_version"
+          helm package charts/codex-proxy --destination /tmp
+          helm push "/tmp/codex-proxy-${chart_version}.tgz" "oci://ghcr.io/${GITHUB_REPOSITORY_OWNER}"
