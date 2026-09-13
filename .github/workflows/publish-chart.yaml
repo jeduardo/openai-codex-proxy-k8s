@@ -3,6 +3,15 @@ name: Publish Helm chart
 on:
   release:
     types: [published]
+  workflow_run:
+    workflows: [Release Please]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -10,13 +19,17 @@ permissions:
 
 jobs:
   publish:
-    if: startsWith(github.event.release.tag_name, 'codex-proxy-v')
+    if: >-
+      github.event_name == 'release' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     steps:
       - name: Check out release tag
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ inputs.tag || github.event.release.tag_name || github.event.workflow_run.head_sha }}
+          fetch-depth: 0
 
       - name: Log in to GHCR
         env:
@@ -26,6 +39,17 @@ jobs:
       - name: Package and publish chart
         run: |
           set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = workflow_run ]; then
+            release_tag=$(git tag --points-at "$GITHUB_SHA" | grep '^codex-proxy-v' | head -n 1 || true)
+          elif [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            release_tag='${{ inputs.tag }}'
+          else
+            release_tag='${{ github.event.release.tag_name }}'
+          fi
+          case "$release_tag" in
+            codex-proxy-v*) ;;
+            *) echo "No codex-proxy release tag found" >&2; exit 1 ;;
+          esac
           chart_version=$(helm show chart charts/codex-proxy | awk '$1 == "version:" { print $2 }')
           test -n "$chart_version"
           helm package charts/codex-proxy --destination /tmp
