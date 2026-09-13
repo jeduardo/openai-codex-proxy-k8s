@@ -1,0 +1,6 @@
+apiVersion: v2
+name: codex-proxy
+description: OpenAI-compatible Codex proxy backed by a ChatGPT Codex login
+type: application
+version: 0.1.0
+appVersion: upstream
