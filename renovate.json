@@ -11,8 +11,7 @@
         "repository: (?<depName>ghcr\\.io\\/hotchpotch\\/openai-api-server-via-codex)\\n  tag: (?<currentValue>[^\\s]+)"
       ],
       "datasourceTemplate": "docker",
-      "versioningTemplate": "docker",
-      "groupName": "upstream Codex proxy"
+      "versioningTemplate": "docker"
     },
     {
       "customType": "regex",
@@ -20,11 +19,14 @@
       "matchStrings": ["appVersion: (?<currentValue>[^\\s]+)"],
       "depNameTemplate": "ghcr.io/hotchpotch/openai-api-server-via-codex",
       "datasourceTemplate": "docker",
-      "versioningTemplate": "docker",
-      "groupName": "upstream Codex proxy"
+      "versioningTemplate": "docker"
     }
   ],
   "packageRules": [
+    {
+      "matchPackageNames": ["ghcr.io/hotchpotch/openai-api-server-via-codex"],
+      "groupName": "upstream Codex proxy"
+    },
     {
       "matchPackageNames": ["ghcr.io/hotchpotch/openai-api-server-via-codex"],
       "matchUpdateTypes": ["major"],
